@@ -1,0 +1,6 @@
+if (y) {
+  return 100U;
+} else {
+  x = bob.age;
+  return x;
+}

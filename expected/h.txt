@@ -1,0 +1,3 @@
+for (unsigned short i = 0; i < 12; i++) {
+  putchar(i);
+}
