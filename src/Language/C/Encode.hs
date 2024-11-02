@@ -211,8 +211,9 @@ unaryOpPrec = \case
   PreDecrement -> 2
   Address -> 2
   Indirection -> 2
+  Cast{} -> 2
 
-encodeUnaryOp :: UnaryOp -> ShortText
+encodeUnaryOp :: UnaryOp -> Builder
 encodeUnaryOp = \case
   PostIncrement -> "++"
   PostDecrement -> "--"
@@ -220,6 +221,7 @@ encodeUnaryOp = \case
   PreDecrement -> "--"
   Address -> "&"
   Indirection -> "*"
+  Cast ty -> "(" <> type_ ty <> ")"
 
 -- Note: all binary operators are left associative.
 binOpPrec :: BinaryOp -> Int
@@ -312,8 +314,9 @@ expr = \case
         PrecBuilder{builder=a',prec=precA} = expr a
         a'' = if precA <= opPrec then a' else wrap a'
      in case opPrec of
-          1 -> PrecBuilder{builder=a'' :> encodeUnaryOp op, prec=opPrec}
-          _ -> PrecBuilder{builder=encodeUnaryOp op :< a'', prec=opPrec}
+          -- All of the operators in precedence group 1 are postfix
+          1 -> PrecBuilder{builder=a'' <> encodeUnaryOp op, prec=opPrec}
+          _ -> PrecBuilder{builder=encodeUnaryOp op <> a'', prec=opPrec}
   Assign a b ->
     let PrecBuilder{builder=a',prec=precA} = expr a
         PrecBuilder{builder=b',prec=precB} = expr b

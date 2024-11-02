@@ -36,6 +36,7 @@ data UnaryOp
   | PostDecrement
   | Address
   | Indirection
+  | Cast Type
 
 data BinaryOp
   = Mul
