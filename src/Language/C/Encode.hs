@@ -4,6 +4,7 @@
 {-# language NamedFieldPuns #-}
 {-# language OverloadedStrings #-}
 {-# language PatternSynonyms #-}
+{-# language MultiWayIf #-}
 
 module Language.C.Encode
   ( PrecBuilder(..)
@@ -14,13 +15,18 @@ module Language.C.Encode
   , literal
   , expr
   , expr_
+  , function
   ) where
 
-import Language.C.Type
-import Language.C.Syntax
+import Prelude hiding (id)
+
+import Language.C.Type (Platform(Short,Int,Long,LongLong))
+import Language.C.Type hiding (Platform(..))
+import Language.C.Syntax hiding (type_,expr)
 import Data.Text.Short (ShortText)
 import Data.Builder.Catenable.Text (Builder,pattern (:<),pattern (:>))
 import Data.Char (ord)
+import Data.Primitive (SmallArray)
 
 import qualified Data.Chunks as Chunks
 import qualified Data.Primitive as PM
@@ -53,6 +59,23 @@ commaPrec = 15
 wrap :: Builder -> Builder
 wrap e = ("(" :< e) :> ")"
 
+-- Includes a space after the keyword.
+constToKeyword :: Const -> ShortText
+constToKeyword = \case
+  ConstYes -> "const "
+  ConstNo -> TS.empty
+
+function :: Function -> Builder
+function Function{returnType,id,arguments,body} =
+  (type_ returnType :> " " :> id :> "(")
+  <>
+  (commaIntercalate declaration (Chunks.concat (BoxedBuilder.run arguments)) :> ") {\n")
+  <>
+  (foldMap (statement "  " "  ") (BoxedBuilder.run body) :> "}\n")
+
+declaration :: Declaration -> Builder
+declaration Declaration{type_=t,id=v} = type_ t :> " " :> v
+
 statement ::
      Builder -- ^ Character, or sequence of characters, that is used to indent one level
   -> Builder -- ^ Current indentation level
@@ -61,13 +84,41 @@ statement ::
 statement oneLevel indentation stmt0 = case stmt0 of
   Expr e -> indentation <> expr_ e <> ";\n"
   ReturnVoid -> indentation <> "return;\n"
+  Label name -> indentation <> Builder.shortText name <> ": ;\n"
+  LabeledCompound label statements ->
+       indentation
+    <> Builder.shortText label
+    <> ": {\n"
+    <> foldMap (statement oneLevel (indentation <> oneLevel)) (BoxedBuilder.run statements)
+    <> indentation
+    <> "}\n"
+  Compound statements ->
+       indentation
+    <> "{\n"
+    <> foldMap (statement oneLevel (indentation <> oneLevel)) (BoxedBuilder.run statements)
+    <> indentation
+    <> "}\n"
+  Goto name -> indentation <> "goto " <> Builder.shortText name <> ";\n"
   Declare t v ->
        indentation
-    <> (type_ t :> " " :> v :> "\n;")
-  Initialize t v e ->
-       indentation
-    <> (type_ t :> " " :> v :> " = ")
-    <> (exprSafeForCleanLiteral_ e :> ";\n")
+    <> (type_ t :> " " :> v :> ";\n")
+  Initialize t c v e ->
+    let PrecBuilder{prec,builder} = exprSafeForCleanLiteral e
+        rhs = if prec > assignPrec
+          then wrap builder
+          else builder
+     in indentation
+        <>
+        (type_ t :> " " :> constToKeyword c :> v :> " = ")
+        <>
+        (rhs :> ";\n")
+  InitializeStruct t c v ds ->
+    let ds' = Chunks.concat (BoxedBuilder.run ds)
+     in indentation
+        <>
+        (type_ t :> " " :> constToKeyword c :> v :> " = {")
+        <>
+        (encodeDesignatedInitializers ds' :> "};\n")
   ForInitialize t v e cond post stmts ->
        indentation
     <> ("for (" :< (type_ t :> " " :> v :> " = "))
@@ -81,13 +132,60 @@ statement oneLevel indentation stmt0 = case stmt0 of
     <> "return "
     <> expr_ e
     <> ";\n"
+  Switch e valCases defCase ->
+       indentation
+    <> "switch ("
+    <> expr_ e
+    <> ") {\n"
+    <> foldMap
+       (\Case{value,body} ->
+         let body' = Chunks.concat (BoxedBuilder.run body) in
+         indentation'
+         <>
+         "case "
+         <>
+         ( case literal value of
+             PrecBuilder{builder} -> builder
+         )
+         <>
+         ":"
+         <>
+         ( case PM.sizeofSmallArray body' of
+             0 -> mempty
+             _ -> case PM.indexSmallArray body' 0 of
+               InitializeStruct{} -> " ;"
+               Initialize{} -> " ;"
+               Declare{} -> " ;"
+               _ -> mempty
+         )
+         <>
+         "\n"
+         <>
+         foldMap
+           (statement oneLevel indentation'')
+           body'
+       ) (BoxedBuilder.run valCases)
+    <> indentation'
+    <> "default:\n"
+    <> foldMap
+         (statement oneLevel indentation'')
+         (BoxedBuilder.run defCase)
+    <> indentation
+    <> "}\n"
+    where
+    !indentation' = indentation <> oneLevel
+    !indentation'' = indentation' <> oneLevel
   IfThen e a ->
+       let a' = Chunks.concat (BoxedBuilder.run a) in
        indentation
     <> "if ("
     <> expr_ e
-    <> ") {\n"
-    <> foldMap (statement oneLevel (indentation <> oneLevel)) (BoxedBuilder.run a)
-    <> (indentation :> "}\n")
+    <> ") "
+    <> ( if | length a' == 1, Expr a0 <- PM.indexSmallArray a' 0 -> expr_ a0 :> ";\n"
+            | otherwise -> "{\n"
+               <> foldMap (statement oneLevel (indentation <> oneLevel)) a'
+               <> (indentation :> "}\n")
+       )
   IfThenElse e a b ->
        indentation
     <> "if ("
@@ -177,6 +275,16 @@ isBinOpComparison = \case
   Ne -> True
   _ -> False
 
+commaIntercalate :: (a -> Builder) -> SmallArray a -> Builder
+{-# inline commaIntercalate #-}
+commaIntercalate f !args = case PM.sizeofSmallArray args of
+  0 -> mempty
+  _ ->
+    let arg0 = PM.indexSmallArray args 0
+     in f arg0
+        <>
+        C.foldMap (\arg -> ", " :< f arg)  (C.slice args 1 (PM.sizeofSmallArray args - 1))
+
 expr :: Expr -> PrecBuilder
 expr = \case
   Constant x -> literal x
@@ -184,15 +292,7 @@ expr = \case
   SizeOf t -> PrecBuilder{builder="sizeof(" :< (type_ t :> ")"),prec=functionCallPrec}
   Call f args ->
     let args' = Chunks.concat (BoxedBuilder.run args)
-        args'' = case PM.sizeofSmallArray args' of
-          0 -> mempty
-          _ ->
-            -- Omits most type annotations for numeric literals that are
-            -- arguments to functions.
-            let arg0 = PM.indexSmallArray args' 0
-             in exprSafeForCleanLiteral_ arg0
-                <>
-                C.foldMap (\arg -> ", " :< exprSafeForCleanLiteral_ arg)  (C.slice args' 1 (PM.sizeofSmallArray args' - 1))
+        args'' = commaIntercalate exprSafeForCleanLiteral_ args'
         PrecBuilder{prec=p,builder=f'} = expr f
         f'' = if p <= functionCallPrec then f' else wrap f'
      in PrecBuilder{builder=f'' <> ("(" :< (args'' :> ")")),prec=indexPrec}
@@ -321,16 +421,20 @@ cleanLiteralSignedInteger size i b = case size of
     _ -> if i >= (-32767) && i <= 32767
       then b
       else signedFixedWidthLiteralInteger w b
-  Short -> if i >= (-32767) && i <= 32767
-    then b
-    else "(short)" :< b
-  Int -> b
-  Long -> if i >= (-32767) && i <= 32767
-    then b
-    else b :> "L"
-  LongLong -> if i >= (-32767) && i <= 32767
-    then b
-    else b :> "LL"
+  Platform p -> case p of
+    T.Size -> if i >= (-32767) && i <= 32767
+      then b
+      else "(ssize_t)" :< b
+    Short -> if i >= (-32767) && i <= 32767
+      then b
+      else "(short)" :< b
+    Int -> b
+    Long -> if i >= (-32767) && i <= 32767
+      then b
+      else b :> "L"
+    LongLong -> if i >= (-32767) && i <= 32767
+      then b
+      else b :> "LL"
 
 cleanLiteralUnsignedInteger ::
      Size
@@ -345,34 +449,42 @@ cleanLiteralUnsignedInteger size i b = case size of
     _ -> if i >= 0 && i <= 65535
       then b
       else unsignedFixedWidthLiteralInteger w b
-  Short -> if i >= 0 && i <= 65535
-    then b
-    else "(unsigned short)" :< b
-  Int -> if i >= 0 && i <= 65535
-    then b
-    else b :> "U"
-  Long -> if i >= 0 && i <= 65535
-    then b
-    else b :> "UL"
-  LongLong -> if i >= 0 && i <= 65535
-    then b
-    else b :> "ULL"
+  Platform p -> case p of
+    T.Size -> if i >= 0 && i <= 65535
+      then b
+      else "(size_t)" :< b
+    Short -> if i >= 0 && i <= 65535
+      then b
+      else "(unsigned short)" :< b
+    Int -> if i >= 0 && i <= 65535
+      then b
+      else b :> "U"
+    Long -> if i >= 0 && i <= 65535
+      then b
+      else b :> "UL"
+    LongLong -> if i >= 0 && i <= 65535
+      then b
+      else b :> "ULL"
 
 signedLiteralInteger :: Size -> Builder -> PrecBuilder
 signedLiteralInteger size i = case size of
   Fixed w -> PrecBuilder{builder=signedFixedWidthLiteralInteger w i, prec=1}
-  Short -> PrecBuilder{builder= "(short)" :< i, prec=2}
-  Int -> PrecBuilder{builder=i, prec=0}
-  Long -> PrecBuilder{builder= i :> "L", prec=0}
-  LongLong -> PrecBuilder{builder= i :> "LL", prec=0}
+  Platform p -> case p of
+    T.Size -> PrecBuilder{builder= "(ssize_t)" :< i, prec=2}
+    Short -> PrecBuilder{builder= "(short)" :< i, prec=2}
+    Int -> PrecBuilder{builder=i, prec=0}
+    Long -> PrecBuilder{builder= i :> "L", prec=0}
+    LongLong -> PrecBuilder{builder= i :> "LL", prec=0}
 
 unsignedLiteralInteger :: Size -> Builder -> PrecBuilder
 unsignedLiteralInteger size i = case size of
   Fixed w -> PrecBuilder{builder=unsignedFixedWidthLiteralInteger w i,prec=1}
-  Short -> PrecBuilder{builder= "(unsigned short)" :< i, prec=2}
-  Int -> PrecBuilder{builder= i :> "U", prec=0}
-  Long -> PrecBuilder{builder= i :> "UL", prec=0}
-  LongLong -> PrecBuilder{builder= i :> "ULL", prec=0}
+  Platform p -> case p of
+    T.Size -> PrecBuilder{builder= "(size_t)" :< i, prec=2}
+    Short -> PrecBuilder{builder= "(unsigned short)" :< i, prec=2}
+    Int -> PrecBuilder{builder= i :> "U", prec=0}
+    Long -> PrecBuilder{builder= i :> "UL", prec=0}
+    LongLong -> PrecBuilder{builder= i :> "ULL", prec=0}
 
 signedFixedWidthLiteralInteger :: Width -> Builder -> Builder
 signedFixedWidthLiteralInteger w i = case w of
@@ -391,12 +503,12 @@ type_ = \case
   T.Integer signedness sz -> case signedness of
     Signed -> signed sz
     Unsigned -> unsigned sz
-  T.Char -> "char"
   Void -> "void"
   Float -> "float"
   Double -> "double"
   Pointer t -> type_ t <> "*"
   Struct t -> "struct " :< t :< mempty
+  Typedef t -> t :< mempty
   X86Vector v -> x86Vector v
   X86Mask w -> x86Mask w
 
@@ -408,10 +520,13 @@ signed = \case
     W16 -> "int16_t"
     W32 -> "int32_t"
     W64 -> "int64_t"
-  Short -> "short"
-  Int -> "int"
-  Long -> "long"
-  LongLong -> "long long"
+  Platform p -> case p of
+    T.Size -> "ssize_t"
+    T.Char -> "signed char"
+    Short -> "short"
+    Int -> "int"
+    Long -> "long"
+    LongLong -> "long long"
 
 -- | Encode an unsigned type.
 unsigned :: Size -> Builder
@@ -421,10 +536,13 @@ unsigned = \case
     W16 -> "uint16_t"
     W32 -> "uint32_t"
     W64 -> "uint64_t"
-  Short -> "unsigned short"
-  Int -> "unsigned int"
-  Long -> "unsigned long"
-  LongLong -> "unsigned long long"
+  Platform p -> case p of
+    T.Size -> "size_t"
+    T.Char -> "unsigned char"
+    Short -> "unsigned short"
+    Int -> "unsigned int"
+    Long -> "unsigned long"
+    LongLong -> "unsigned long long"
 
 x86Vector :: X86.Vector -> Builder
 x86Vector X86.Vector{width,element} =
@@ -448,3 +566,16 @@ x86Mask = \case
   W16 -> "__mmask16"
   W32 -> "__mmask32"
   W64 -> "__mmask64"
+
+encodeDesignatedInitializers :: SmallArray DesignatedInitializer -> Builder
+encodeDesignatedInitializers !xs = case PM.sizeofSmallArray xs of
+  0 -> mempty
+  _ -> go 1 (encodeDesignatedInitializer (PM.indexSmallArray xs 0))
+  where
+  go !ix !acc = if ix < PM.sizeofSmallArray xs
+    then go (ix + 1) (acc <> ", " <> encodeDesignatedInitializer (PM.indexSmallArray xs ix))
+    else acc
+
+encodeDesignatedInitializer :: DesignatedInitializer -> Builder
+encodeDesignatedInitializer (DesignatedInitializer a b) =
+  "." <> Builder.shortText a <> " = " <> expr_ b

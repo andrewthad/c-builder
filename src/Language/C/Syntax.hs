@@ -1,20 +1,33 @@
+{-# language DuplicateRecordFields #-}
+
 module Language.C.Syntax
   ( Expr(..)
   , UnaryOp(..)
   , BinaryOp(..)
   , Literal(..)
   , Statement(..)
+  , DesignatedInitializer(..)
+  , Case(..)
+  , Function(..)
+  , Declaration(..)
+    -- * Helpers for Literals
+  , u32
   ) where
 
+import Prelude hiding (id)
+
 import Data.Builder.Catenable (Builder)
-import Language.C.Type (Type,Size,Signedness)
+import Language.C.Type (Type,Size,Signedness,Const)
 import Data.Text.Short (ShortText)
 import Data.Int (Int64)
-import Data.Word (Word64)
+import Data.Word (Word64,Word32)
+
+import qualified Language.C.Type as Ty
 
 type LabelId = ShortText
 type VarId = ShortText
 type MemberId = ShortText
+type FunctionId = ShortText
 
 data UnaryOp
   = PreIncrement
@@ -58,6 +71,9 @@ data Expr
   = Comma Expr Expr
     -- ^ e.g. @a++, b++@
   | Call Expr (Builder Expr)
+    -- ^ Call a function. The first argument is expr instead of @ShortText@
+    -- because there is a way to call function pointers by dereferencing
+    -- them first.
   | Constant Literal
   | Index Expr Expr
     -- ^ e.g. @foo[bar]@
@@ -67,26 +83,60 @@ data Expr
     -- ^ e.g. @foo.bar@
   | SizeOf Type
     -- ^ Only taking the size of a type is supported. Taking the size of
-    -- an expression is not useful when generating C. (Or really when
-    -- writing C by hand for that matter.)
+    -- an expression is not useful when generating C.
   | Unary UnaryOp Expr
+    -- ^ Invoke a unary operator (e.g. @++@, @--@, @&@, @*@).
   | Binary BinaryOp Expr Expr
+    -- ^ Invoke a binary operator (e.g. @+@, @>@)
   | Assign Expr Expr
     -- ^ Assignment mixed with infix operators is not currently supported.
   | Var VarId
+    -- ^ Reference a variable or a function name.
+
+-- | A function declaration
+data Function = Function
+  { returnType :: !Type
+    -- ^ Return type
+  , id :: !FunctionId
+    -- ^ The name of the function
+  , arguments :: !(Builder Declaration)
+    -- ^ Typed arguments. Old-style C function declarations are not supported.
+  , body :: !(Builder Statement)
+    -- ^ Function body
+  }
+
+-- | The declaration of a variable
+data Declaration = Declaration
+  { type_ :: !Type
+  , id :: !VarId
+  }
+
+data DesignatedInitializer = DesignatedInitializer
+  { member :: !MemberId
+  , expr :: !Expr
+  }
 
 -- | A single statement.
 data Statement
   = Expr Expr
     -- ^ Evaluate the expression and discard the results. Lifts an expression
     -- into a statement.
+  | Compound (Builder Statement)
+    -- ^ Explicitly create a compound statement. Usually this is not needed
+    -- since if-then-else and for loops take statement builders (instead of
+    -- a single statement) as their argument. However, this can be useful
+    -- for restricting variable scope. 
   | Declare Type VarId
     -- ^ Declare a variable (e.g. @int x;@). Use 'Initialize' to pair declaration
     -- with assignment.
-  | Initialize Type VarId Expr
+  | Initialize Type Const VarId Expr
     -- ^ Declare and initialize a variable (e.g. @int x = z + 5;@).
-  | IfThen Expr (Builder Statement)
+    -- The @const@ modifier (e.g. @int const y@) prohibits subsequent reassignment.
+  | InitializeStruct Type Const VarId (Builder DesignatedInitializer)
+    -- ^ Declare and initialize a struct using designated initializers.
+    -- For example: @struct foo x = {.bar = 19, .baz = a + b}@
   | IfThenElse Expr (Builder Statement) (Builder Statement)
+  | IfThen Expr (Builder Statement)
   | ForInitialize Type VarId Expr Expr Expr (Builder Statement)
     -- ^ A for loop where the first component is a declaration with an
     -- initializer. (e.g. @for(int i = 0; i < 30; i++)@).
@@ -98,23 +148,33 @@ data Statement
     -- Note: The standard allows programs to omit parts of the loop.
     -- That is not supported by this library.
   | Break
+    -- ^ The C @break@ keyword used to break out of @for@, @if@, and @switch@.
   | Label LabelId
     -- ^ C has a restriction that labels must be followed by statements.
     -- This causes compilation failures when a declaration follows a label.
     -- The solution is to place a semicolon after the label to create an
     -- empty statement. The encode functions add this semicolon for the user
     -- when it is needed so that the user does not shoulder this burden.
+  | LabeledCompound LabelId (Builder Statement)
+    -- ^ Fused @Label@ and @Compound@ that results in prettier output. 
   | Goto LabelId
+    -- ^ Jump to the label with @goto@.
   | ReturnVoid
+    -- ^ Return from a function (i.e. @return@) that returns @void@.
   | Return Expr
+    -- ^ Return from a function (i.e. @return@) that returns a value.
   | Switch
+      Expr -- ^ Selector expression
       (Builder Case) -- ^ Cases, may fall through
       (Builder Statement) -- ^ Default
 
 data Case = Case
-  { expr :: Expr
+  { value :: Literal
     -- ^ The constant expression that must be matched for this case
     -- to be taken.
   , body :: Builder Statement
   }
 
+u32 :: Word32 -> Literal
+{-# inline u32 #-}
+u32 w = Integer Ty.Unsigned (Ty.Fixed Ty.W32) (toInteger w)

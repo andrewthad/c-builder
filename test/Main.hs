@@ -23,6 +23,7 @@ import Language.C.Type (Signedness(Signed,Unsigned))
 import Language.C.Type (Type(Pointer))
 import Language.C.Type (Size(Short,Int,Fixed))
 import Language.C.Type (Width(W64,W8))
+import Language.C.Type (Const(ConstYes,ConstNo))
 
 import qualified Data.Bytes as Bytes
 import qualified Data.Bytes.Chunks as Chunks
@@ -61,7 +62,7 @@ tests = testGroup "test"
       pure (prepare (Encode.statement "  " mempty e))
   , goldenVsString "e" "expected/e.txt" $ do
       let e = IfThen (Var "y")
-            [ Initialize (Pointer (T.Integer Unsigned (Fixed W64))) "r"
+            [ Initialize (Pointer (T.Integer Unsigned (Fixed W64))) ConstNo "r"
                 (Index (Var "arr") (Var "ix"))
             , Return (Binary Add (Var "r") (Constant (Integer Unsigned (Fixed W64) 100)))
             ]
@@ -86,5 +87,12 @@ tests = testGroup "test"
             (Binary Lt (Var "i") (Constant (Integer Unsigned Short 12)))
             (Unary PostIncrement (Var "i"))
             [Expr (Call (Var "putchar") [Var "i"])]
+      pure (prepare (Encode.statement "  " mempty e))
+  , goldenVsString "i" "expected/i.txt" $ do
+      let e = IfThen (Var "y")
+            [ Initialize (Pointer (T.Integer Unsigned (Fixed W64))) ConstYes "r"
+                (Index (Var "arr") (Var "ix"))
+            , Return (Binary Add (Var "r") (Constant (Integer Unsigned (Fixed W64) 100)))
+            ]
       pure (prepare (Encode.statement "  " mempty e))
   ]

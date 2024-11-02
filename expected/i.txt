@@ -1,0 +1,4 @@
+if (y) {
+  uint64_t* const r = arr[ix];
+  return r + UINT64_C(100);
+}
