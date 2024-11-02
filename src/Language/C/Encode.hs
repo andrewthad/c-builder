@@ -343,8 +343,20 @@ expr = \case
 literal :: Literal -> PrecBuilder
 literal = \case
   S.Integer signedness size i ->
-    let !enc = TS.pack (show i) :< mempty in
-    case signedness of
+    let !enc = case signedness of
+          -- We have a few special cases in here to present certain
+          -- numbers in hexadecimal. These numbers tend to occur when
+          -- performing bit arithmetic. The list is just based on
+          -- situations that I ran into while using this library.
+          Unsigned -> case size of
+            Fixed W32 -> case i of
+              4294967288 -> "0xFFFFFFF8" :< mempty
+              4294967292 -> "0xFFFFFFFC" :< mempty
+              4294967295 -> "0xFFFFFFFF" :< mempty
+              _ -> TS.pack (show i) :< mempty
+            _ -> TS.pack (show i) :< mempty
+          Signed -> TS.pack (show i) :< mempty
+     in case signedness of
       Signed -> signedLiteralInteger size enc
       Unsigned -> unsignedLiteralInteger size enc
   S.Char c -> PrecBuilder 0 $ case c of
