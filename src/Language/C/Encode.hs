@@ -292,6 +292,9 @@ expr = \case
   Constant x -> literal x
   Var v -> PrecBuilder{builder=v :< mempty,prec=0}
   SizeOf t -> PrecBuilder{builder="sizeof(" :< (type_ t :> ")"),prec=functionCallPrec}
+  SizeOfExpr e ->
+    let PrecBuilder{builder} = expr e
+     in PrecBuilder{builder="sizeof(" :< (builder :> ")"),prec=functionCallPrec}
   Call f args ->
     let args' = Chunks.concat (BoxedBuilder.run args)
         args'' = commaIntercalate exprSafeForCleanLiteral_ args'

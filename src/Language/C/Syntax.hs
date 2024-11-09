@@ -83,8 +83,9 @@ data Expr
   | Dot Expr MemberId
     -- ^ e.g. @foo.bar@
   | SizeOf Type
-    -- ^ Only taking the size of a type is supported. Taking the size of
-    -- an expression is not useful when generating C.
+    -- ^ Use this to take the size of a type. Lowers to @sizeof(...)@.
+  | SizeOfExpr Expr
+    -- ^ Use this to take the size of an expression. Lowers to @sizeof(...)@.
   | Unary UnaryOp Expr
     -- ^ Invoke a unary operator (e.g. @++@, @--@, @&@, @*@).
   | Binary BinaryOp Expr Expr
