@@ -36,6 +36,8 @@ data UnaryOp
   | PostDecrement
   | Address
   | Indirection
+  | Not
+  | LogicalNot
   | Cast Type
 
 data BinaryOp

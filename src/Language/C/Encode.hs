@@ -211,6 +211,8 @@ unaryOpPrec = \case
   PreDecrement -> 2
   Address -> 2
   Indirection -> 2
+  Not -> 2
+  LogicalNot -> 2
   Cast{} -> 2
 
 encodeUnaryOp :: UnaryOp -> Builder
@@ -221,6 +223,8 @@ encodeUnaryOp = \case
   PreDecrement -> "--"
   Address -> "&"
   Indirection -> "*"
+  Not -> "~"
+  LogicalNot -> "!"
   Cast ty -> "(" <> type_ ty <> ")"
 
 -- Note: all binary operators are left associative.
