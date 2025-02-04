@@ -187,16 +187,25 @@ statement oneLevel indentation stmt0 = case stmt0 of
                <> (indentation :> "}\n")
        )
   IfThenElse e a b ->
+    let a' = Chunks.concat (BoxedBuilder.run a) in
+    let b' = Chunks.concat (BoxedBuilder.run b) in
        indentation
     <> "if ("
     <> expr_ e
-    <> ") {\n"
-    <> foldMap (statement oneLevel (indentation <> oneLevel)) (BoxedBuilder.run a)
-    <> indentation
-    <> "} else {\n"
-    <> foldMap (statement oneLevel (indentation <> oneLevel)) (BoxedBuilder.run b)
-    <> indentation
-    <> "}\n"
+    <> ") "
+    <> ( if | length a' == 1
+            , length b' == 1
+            , Expr a0 <- PM.indexSmallArray a' 0
+            , Expr b0 <- PM.indexSmallArray b' 0 ->
+                expr_ a0 <> ";\n" <> indentation <> "else " <> expr_ b0 <> ";\n"
+            | otherwise -> "{\n"
+                <> foldMap (statement oneLevel (indentation <> oneLevel)) a'
+                <> indentation
+                <> "} else {\n"
+                <> foldMap (statement oneLevel (indentation <> oneLevel)) b'
+                <> indentation
+                <> "}\n"
+       )
 
 expr_ :: Expr -> Builder
 expr_ e = let PrecBuilder{builder} = expr e in builder
