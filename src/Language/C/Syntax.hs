@@ -17,17 +17,17 @@ module Language.C.Syntax
 import Prelude hiding (id)
 
 import Data.Builder.Catenable (Builder)
-import Language.C.Type (Type,Size,Signedness,Const)
-import Data.Text.Short (ShortText)
 import Data.Int (Int64)
+import Data.Text (Text)
 import Data.Word (Word64,Word32)
+import Language.C.Type (Type,Size,Signedness,Const)
 
 import qualified Language.C.Type as Ty
 
-type LabelId = ShortText
-type VarId = ShortText
-type MemberId = ShortText
-type FunctionId = ShortText
+type LabelId = Text
+type VarId = Text
+type MemberId = Text
+type FunctionId = Text
 
 data UnaryOp
   = PreIncrement
@@ -66,7 +66,7 @@ data Literal
     -- ^ Note that @char@ literals have type @int@ in C. Be careful
     -- using these. Sometimes, they can make @switch@ statements
     -- more readable. Do not use characters outside of the ASCII plane.
-  | String !ShortText
+  | String !Text
     -- ^ A string literal
 
 -- | An inline expression.
@@ -74,7 +74,7 @@ data Expr
   = Comma Expr Expr
     -- ^ e.g. @a++, b++@
   | Call Expr (Builder Expr)
-    -- ^ Call a function. The first argument is expr instead of @ShortText@
+    -- ^ Call a function. The first argument is expr instead of @Text@
     -- because there is a way to call function pointers by dereferencing
     -- them first.
   | Constant Literal
@@ -88,6 +88,10 @@ data Expr
     -- ^ Use this to take the size of a type. Lowers to @sizeof(...)@.
   | SizeOfExpr Expr
     -- ^ Use this to take the size of an expression. Lowers to @sizeof(...)@.
+  | OffsetOf
+      -- ^ Use this to take the offset of a structure member. Lowers to @offsetof(...)@.
+      Type -- This should be a struct type
+      Text -- The member name
   | Unary UnaryOp Expr
     -- ^ Invoke a unary operator (e.g. @++@, @--@, @&@, @*@).
   | Binary BinaryOp Expr Expr

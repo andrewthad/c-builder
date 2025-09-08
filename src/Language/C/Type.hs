@@ -22,9 +22,9 @@ module Language.C.Type
   , pattern UnsignedSize
   ) where
 
-import Data.Text.Short (ShortText)
-import Language.C.Type.Width (Width(..))
+import Data.Text (Text)
 import Language.C.Type.Signedness (Signedness(..))
+import Language.C.Type.Width (Width(..))
 
 import qualified Language.C.Type.X86 as X86
 
@@ -89,8 +89,8 @@ data Type
   | Float
   | Double
   | Void
-  | Struct !ShortText
-  | Typedef !ShortText
+  | Struct !Text
+  | Typedef !Text
   | Pointer !Type
   | X86Vector !X86.Vector
   | X86Mask !Width

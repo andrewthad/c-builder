@@ -26,6 +26,7 @@ import Language.C.Syntax hiding (type_,expr)
 import Data.Text.Short (ShortText)
 import Data.Builder.Catenable.Text (Builder,pattern (:<),pattern (:>))
 import Data.Char (ord)
+import Data.Text (Text)
 import Data.Primitive (SmallArray)
 
 import qualified Data.Chunks as Chunks
@@ -34,6 +35,7 @@ import qualified Data.Primitive.Contiguous as C
 import qualified Language.C.Syntax as S
 import qualified Language.C.Type as T
 import qualified Language.C.Type.X86 as X86
+import qualified Data.Text as T
 import qualified Data.Text.Short as TS
 import qualified Data.Builder.Catenable.Text as Builder
 import qualified Data.Builder.Catenable as BoxedBuilder
@@ -60,10 +62,10 @@ wrap :: Builder -> Builder
 wrap e = ("(" :< e) :> ")"
 
 -- Includes a space after the keyword.
-constToKeyword :: Const -> ShortText
+constToKeyword :: Const -> Text
 constToKeyword = \case
   ConstYes -> "const "
-  ConstNo -> TS.empty
+  ConstNo -> T.empty
 
 function :: Function -> Builder
 function Function{returnType,id,arguments,body} =
@@ -84,10 +86,10 @@ statement ::
 statement oneLevel indentation stmt0 = case stmt0 of
   Expr e -> indentation <> expr_ e <> ";\n"
   ReturnVoid -> indentation <> "return;\n"
-  Label name -> indentation <> Builder.shortText name <> ": ;\n"
+  Label name -> indentation <> Builder.text name <> ": ;\n"
   LabeledCompound label statements ->
        indentation
-    <> Builder.shortText label
+    <> Builder.text label
     <> ": {\n"
     <> foldMap (statement oneLevel (indentation <> oneLevel)) (BoxedBuilder.run statements)
     <> indentation
@@ -98,7 +100,7 @@ statement oneLevel indentation stmt0 = case stmt0 of
     <> foldMap (statement oneLevel (indentation <> oneLevel)) (BoxedBuilder.run statements)
     <> indentation
     <> "}\n"
-  Goto name -> indentation <> "goto " <> Builder.shortText name <> ";\n"
+  Goto name -> indentation <> "goto " <> Builder.text name <> ";\n"
   Declare t v ->
        indentation
     <> (type_ t :> " " :> v :> ";\n")
@@ -259,7 +261,7 @@ binOpPrec = \case
   LogicalOr -> 12
 
 -- Include whitespace around the operator
-encodeBinOp :: BinaryOp -> ShortText
+encodeBinOp :: BinaryOp -> Text
 encodeBinOp = \case
   Mul -> " * "
   Div -> " / "
@@ -372,9 +374,9 @@ literal = \case
               4294967288 -> "0xFFFFFFF8" :< mempty
               4294967292 -> "0xFFFFFFFC" :< mempty
               4294967295 -> "0xFFFFFFFF" :< mempty
-              _ -> TS.pack (show i) :< mempty
-            _ -> TS.pack (show i) :< mempty
-          Signed -> TS.pack (show i) :< mempty
+              _ -> T.pack (show i) :< mempty
+            _ -> T.pack (show i) :< mempty
+          Signed -> T.pack (show i) :< mempty
      in case signedness of
       Signed -> signedLiteralInteger size enc
       Unsigned -> unsignedLiteralInteger size enc
@@ -385,7 +387,7 @@ literal = \case
     '\f' -> "'\\f'"
     '\'' -> "'\\''"
     _ | ord c >= 0x20 && ord c <= 0x7E ->
-          TS.singleton '\'' :< TS.singleton c :< TS.singleton '\'' :< mempty
+          T.singleton '\'' :< T.singleton c :< T.singleton '\'' :< mempty
     _ -> error "Language.C.Encode.literal: finish writing out character encoding"
 
 data PrecBuilder = PrecBuilder
@@ -396,23 +398,23 @@ data PrecBuilder = PrecBuilder
 exprSafeForCleanLiteral_ :: Expr -> Builder
 exprSafeForCleanLiteral_ e = case e of
   Constant (S.Integer Signed sz n) ->
-    let !enc = TS.pack (show n) :< mempty
+    let !enc = T.pack (show n) :< mempty
      in cleanLiteralSignedInteger sz n enc
   Constant (S.Integer Unsigned sz n) ->
-    let !enc = TS.pack (show n) :< mempty
+    let !enc = T.pack (show n) :< mempty
      in cleanLiteralUnsignedInteger sz n enc
   _ -> let PrecBuilder{builder=r} = expr e in r
 
 exprSafeForCleanLiteral :: Expr -> PrecBuilder
 exprSafeForCleanLiteral e = case e of
   Constant (S.Integer Signed sz n) ->
-    let !enc = TS.pack (show n) :< mempty
+    let !enc = T.pack (show n) :< mempty
      in PrecBuilder
           { builder = cleanLiteralSignedInteger sz n enc
           , prec = 0
           }
   Constant (S.Integer Unsigned sz n) ->
-    let !enc = TS.pack (show n) :< mempty
+    let !enc = T.pack (show n) :< mempty
      in PrecBuilder
           { builder = cleanLiteralUnsignedInteger sz n enc
           , prec = 0
@@ -609,4 +611,4 @@ encodeDesignatedInitializers !xs = case PM.sizeofSmallArray xs of
 
 encodeDesignatedInitializer :: DesignatedInitializer -> Builder
 encodeDesignatedInitializer (DesignatedInitializer a b) =
-  "." <> Builder.shortText a <> " = " <> expr_ b
+  "." <> Builder.text a <> " = " <> expr_ b
