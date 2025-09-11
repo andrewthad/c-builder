@@ -361,6 +361,11 @@ expr = \case
         ix' = exprSafeForCleanLiteral_ ix
         e'' = if p <= indexPrec then e' else wrap e'
      in PrecBuilder{builder=e'' <> ("[" :< (ix' :> "]")),prec=indexPrec}
+  DesignatedInitializers ds ->
+    -- The precedence is made up because this cannot actually be used as
+    -- an expression generally.
+    let ds' = Chunks.concat (BoxedBuilder.run ds)
+     in PrecBuilder{builder="{" :< (encodeDesignatedInitializers ds' :> "}"), prec=0}
 
 literal :: Literal -> PrecBuilder
 literal = \case

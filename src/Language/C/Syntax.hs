@@ -100,6 +100,9 @@ data Expr
     -- ^ Assignment mixed with infix operators is not currently supported.
   | Var VarId
     -- ^ Reference a variable or a function name.
+  | DesignatedInitializers !(Builder DesignatedInitializer)
+    -- ^ This is not really an expression, and it can only appear on the RHS of
+    -- the initialization of a struct.
 
 -- | A function declaration
 data Function = Function
