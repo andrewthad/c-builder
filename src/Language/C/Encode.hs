@@ -369,6 +369,10 @@ expr = \case
 
 literal :: Literal -> PrecBuilder
 literal = \case
+  S.String t
+    | T.all (\c -> c > '\n' && c <= '~' && c /= '"') t ->
+        PrecBuilder 0 ((T.singleton '"' :< Builder.text t) :> T.singleton '"')
+    | otherwise -> error "Language.C.Encode.literal: figure out strings"
   S.Integer signedness size i ->
     let !enc = case signedness of
           -- We have a few special cases in here to present certain
