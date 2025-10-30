@@ -103,6 +103,8 @@ data Expr
   | DesignatedInitializers !(Builder DesignatedInitializer)
     -- ^ This is not really an expression, and it can only appear on the RHS of
     -- the initialization of a struct.
+  | Array !(Builder Expr)
+    -- ^ An array literal.
 
 -- | A function declaration
 data Function = Function

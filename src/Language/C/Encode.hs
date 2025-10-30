@@ -311,6 +311,10 @@ expr = \case
   SizeOfExpr e ->
     let PrecBuilder{builder} = expr e
      in PrecBuilder{builder="sizeof(" :< (builder :> ")"),prec=functionCallPrec}
+  Array args ->
+    let args' = Chunks.concat (BoxedBuilder.run args)
+        args'' = commaIntercalate exprSafeForCleanLiteral_ args'
+     in PrecBuilder{builder="[" :< (args'' :> "]"),prec=0}
   Call f args ->
     let args' = Chunks.concat (BoxedBuilder.run args)
         args'' = commaIntercalate exprSafeForCleanLiteral_ args'
