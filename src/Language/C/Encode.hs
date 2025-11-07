@@ -311,7 +311,7 @@ expr = \case
   SizeOfExpr e ->
     let PrecBuilder{builder} = expr e
      in PrecBuilder{builder="sizeof(" :< (builder :> ")"),prec=functionCallPrec}
-  Array args ->
+  S.Array args ->
     let args' = Chunks.concat (BoxedBuilder.run args)
         args'' = commaIntercalate exprSafeForCleanLiteral_ args'
      in PrecBuilder{builder="[" :< (args'' :> "]"),prec=0}
@@ -554,6 +554,7 @@ type_ = \case
   Float -> "float"
   Double -> "double"
   Pointer t -> type_ t <> "*"
+  T.Array t -> type_ t <> "[]"
   Struct t -> "struct " :< t :< mempty
   Typedef t -> t :< mempty
   X86Vector v -> x86Vector v

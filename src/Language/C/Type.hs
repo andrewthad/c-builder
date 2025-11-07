@@ -92,5 +92,6 @@ data Type
   | Struct !Text
   | Typedef !Text
   | Pointer !Type
+  | Array !Type
   | X86Vector !X86.Vector
   | X86Mask !Width
