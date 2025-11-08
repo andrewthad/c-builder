@@ -315,6 +315,10 @@ expr = \case
     let args' = Chunks.concat (BoxedBuilder.run args)
         args'' = commaIntercalate exprSafeForCleanLiteral_ args'
      in PrecBuilder{builder="[" :< (args'' :> "]"),prec=0}
+  S.Initializers args ->
+    let args' = Chunks.concat (BoxedBuilder.run args)
+        args'' = commaIntercalate exprSafeForCleanLiteral_ args'
+     in PrecBuilder{builder="{" :< (args'' :> "}"),prec=0}
   Call f args ->
     let args' = Chunks.concat (BoxedBuilder.run args)
         args'' = commaIntercalate exprSafeForCleanLiteral_ args'

@@ -105,6 +105,8 @@ data Expr
     -- the initialization of a struct.
   | Array !(Builder Expr)
     -- ^ An array literal.
+  | Initializers !(Builder Expr)
+    -- ^ Initialized in braces, without names. (e.g. @{40, 100, 17}@)
 
 -- | A function declaration
 data Function = Function
