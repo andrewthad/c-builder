@@ -459,7 +459,7 @@ typeSuppressionAndExprSafeForCleanLiteral_ targetTy e = case e of
     let !enc = T.pack (show n) :< mempty
      in cleanLiteralUnsignedInteger sz n enc
   CompoundLiteral s ty ds
-    | StaticNo <- s, ty == targetTy -> encodeDesignatedInitializers (Chunks.concat (BoxedBuilder.run ds))
+    | StaticNo <- s, ty == targetTy -> "{" :< (encodeDesignatedInitializers (Chunks.concat (BoxedBuilder.run ds)) :> "}")
   _ -> let PrecBuilder{builder=r} = expr e in r
 
 exprSafeForCleanLiteral_ :: Expr -> Builder
