@@ -329,7 +329,7 @@ expr = \case
      in PrecBuilder{builder="[" :< (args'' :> "]"),prec=0}
   CompoundLiteralArray s ty args ->
     let args' = Chunks.concat (BoxedBuilder.run args)
-        args'' = commaIntercalate exprSafeForCleanLiteral_ args'
+        args'' = commaIntercalate (typeSuppressionAndExprSafeForCleanLiteral_ ty) args'
      in PrecBuilder
         { builder=
             ( case s of
@@ -449,6 +449,18 @@ data PrecBuilder = PrecBuilder
   { prec :: !Int
   , builder :: !Builder
   }
+
+typeSuppressionAndExprSafeForCleanLiteral_ :: Type -> Expr -> Builder
+typeSuppressionAndExprSafeForCleanLiteral_ targetTy e = case e of
+  Constant (S.Integer Signed sz n) ->
+    let !enc = T.pack (show n) :< mempty
+     in cleanLiteralSignedInteger sz n enc
+  Constant (S.Integer Unsigned sz n) ->
+    let !enc = T.pack (show n) :< mempty
+     in cleanLiteralUnsignedInteger sz n enc
+  CompoundLiteral s ty ds
+    | StaticNo <- s, ty == targetTy -> encodeDesignatedInitializers (Chunks.concat (BoxedBuilder.run ds))
+  _ -> let PrecBuilder{builder=r} = expr e in r
 
 exprSafeForCleanLiteral_ :: Expr -> Builder
 exprSafeForCleanLiteral_ e = case e of
