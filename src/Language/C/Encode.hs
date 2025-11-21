@@ -105,7 +105,11 @@ statement oneLevel indentation stmt0 = case stmt0 of
        indentation
     <> (type_ t :> " " :> v :> ";\n")
   Initialize t c v e ->
-    let PrecBuilder{prec,builder} = exprSafeForCleanLiteral e
+    let PrecBuilder{prec,builder} = case e of
+          -- If the type annotation on a compound literal matches the binder type
+          -- exactly, it can be omitted.
+          CompoundLiteral s ty ds | StaticNo <- s, ty == t -> encodeDesignatedInitializersToPrecBuilder ds
+          _ -> exprSafeForCleanLiteral e
         rhs = if prec > assignPrec
           then wrap builder
           else builder
@@ -208,6 +212,14 @@ statement oneLevel indentation stmt0 = case stmt0 of
                 <> indentation
                 <> "}\n"
        )
+
+encodeDesignatedInitializersToPrecBuilder :: BoxedBuilder.Builder DesignatedInitializer -> PrecBuilder
+encodeDesignatedInitializersToPrecBuilder ds =
+  let ds' = Chunks.concat (BoxedBuilder.run ds)
+   in PrecBuilder
+      { builder="{" :< (encodeDesignatedInitializers ds' :> "}")
+      , prec=0
+      }
 
 expr_ :: Expr -> Builder
 expr_ e = let PrecBuilder{builder} = expr e in builder
@@ -384,12 +396,7 @@ expr = \case
         ix' = exprSafeForCleanLiteral_ ix
         e'' = if p <= indexPrec then e' else wrap e'
      in PrecBuilder{builder=e'' <> ("[" :< (ix' :> "]")),prec=indexPrec}
-  DesignatedInitializers ds ->
-    let ds' = Chunks.concat (BoxedBuilder.run ds)
-     in PrecBuilder
-        { builder="{" :< (encodeDesignatedInitializers ds' :> "}")
-        , prec=0
-        }
+  DesignatedInitializers ds -> encodeDesignatedInitializersToPrecBuilder ds
   CompoundLiteral s ty ds ->
     let ds' = Chunks.concat (BoxedBuilder.run ds)
      in PrecBuilder

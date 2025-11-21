@@ -69,6 +69,7 @@ data Platform
   | Long
   | LongLong
   | Size
+  deriving (Eq)
 
 -- Note: Char is weird. Using @char@ without a signedness
 -- modified results in platform-defined behavior. It is always
@@ -76,18 +77,22 @@ data Platform
 data Size
   = Fixed !Width
   | Platform !Platform
+  deriving (Eq)
 
 data Restrict
   = RestrictYes
   | RestrictNo
+  deriving (Eq)
 
 data Static
   = StaticYes
   | StaticNo
+  deriving (Eq)
 
 data Const
   = ConstYes
   | ConstNo
+  deriving (Eq)
 
 data Type
   = Integer Signedness Size
@@ -101,3 +106,4 @@ data Type
   | X86Vector !X86.Vector
   | X86Mask !Width
   | Const !Type -- a type qualified by by "const", do not nest these
+  deriving (Eq)

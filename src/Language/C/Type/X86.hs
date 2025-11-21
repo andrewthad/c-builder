@@ -20,12 +20,14 @@ data Vector = Vector
   { width :: !Width
   , element :: !Element
   }
+  deriving (Eq)
 
 -- | Width of a vector register.
 data Width
   = W128
   | W256
   | W512
+  deriving (Eq)
 
 data Element
   = Double
@@ -35,3 +37,4 @@ data Element
   | Integer
     -- ^ Integral element, could be 8-bit, 16-bit, 32-bit, or 64-bit
     -- depending on the operation used.
+  deriving (Eq)
