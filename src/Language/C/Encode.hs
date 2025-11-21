@@ -327,7 +327,7 @@ expr = \case
             <>
             type_ ty
             <>
-            ("){" :< (args'' :> "}"))
+            ("[]){" :< (args'' :> "}"))
         , prec=0
         }
   S.Initializers args ->
