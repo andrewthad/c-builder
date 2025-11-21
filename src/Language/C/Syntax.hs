@@ -101,8 +101,14 @@ data Expr
   | Var VarId
     -- ^ Reference a variable or a function name.
   | DesignatedInitializers !(Builder DesignatedInitializer)
-    -- ^ This is not really an expression, and it can only appear on the RHS of
-    -- the initialization of a struct.
+  | CompoundLiteral -- ^ Always a struct
+      !Ty.Static -- Does this struct have static storage?
+      !Type -- The name of the type
+      !(Builder DesignatedInitializer)
+  | CompoundLiteralArray -- ^ Always an array
+      !Ty.Static -- Does this struct have static storage?
+      !Type -- The name of the element type
+      !(Builder Expr)
   | Array !(Builder Expr)
     -- ^ An array literal.
   | Initializers !(Builder Expr)

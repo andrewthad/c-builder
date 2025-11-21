@@ -7,6 +7,7 @@ module Language.C.Type
   , Size(..)
   , Signedness(..)
   , Restrict(..)
+  , Static(..)
   , Const(..)
     -- * Patterns for common types
   , pattern Signed8
@@ -80,6 +81,10 @@ data Restrict
   = RestrictYes
   | RestrictNo
 
+data Static
+  = StaticYes
+  | StaticNo
+
 data Const
   = ConstYes
   | ConstNo
@@ -95,3 +100,4 @@ data Type
   | Array !Type
   | X86Vector !X86.Vector
   | X86Mask !Width
+  | Const !Type -- a type qualified by by "const", do not nest these

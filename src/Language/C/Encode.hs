@@ -315,6 +315,21 @@ expr = \case
     let args' = Chunks.concat (BoxedBuilder.run args)
         args'' = commaIntercalate exprSafeForCleanLiteral_ args'
      in PrecBuilder{builder="[" :< (args'' :> "]"),prec=0}
+  CompoundLiteralArray s ty args ->
+    let args' = Chunks.concat (BoxedBuilder.run args)
+        args'' = commaIntercalate exprSafeForCleanLiteral_ args'
+     in PrecBuilder
+        { builder=
+            ( case s of
+                StaticYes -> "(static "
+                StaticNo -> "("
+            )
+            <>
+            type_ ty
+            <>
+            ("){" :< (args'' :> "}"))
+        , prec=0
+        }
   S.Initializers args ->
     let args' = Chunks.concat (BoxedBuilder.run args)
         args'' = commaIntercalate exprSafeForCleanLiteral_ args'
@@ -370,10 +385,25 @@ expr = \case
         e'' = if p <= indexPrec then e' else wrap e'
      in PrecBuilder{builder=e'' <> ("[" :< (ix' :> "]")),prec=indexPrec}
   DesignatedInitializers ds ->
-    -- The precedence is made up because this cannot actually be used as
-    -- an expression generally.
     let ds' = Chunks.concat (BoxedBuilder.run ds)
-     in PrecBuilder{builder="{" :< (encodeDesignatedInitializers ds' :> "}"), prec=0}
+     in PrecBuilder
+        { builder="{" :< (encodeDesignatedInitializers ds' :> "}")
+        , prec=0
+        }
+  CompoundLiteral s ty ds ->
+    let ds' = Chunks.concat (BoxedBuilder.run ds)
+     in PrecBuilder
+        { builder=
+            ( case s of
+                StaticYes -> "(static "
+                StaticNo -> "("
+            )
+            <>
+            type_ ty
+            <>
+            ("){" :< (encodeDesignatedInitializers ds' :> "}"))
+        , prec=0
+        }
 
 literal :: Literal -> PrecBuilder
 literal = \case
@@ -476,6 +506,9 @@ cleanLiteralSignedInteger size i b = case size of
     T.Size -> if i >= (-32767) && i <= 32767
       then b
       else "(ssize_t)" :< b
+    T.Char -> if i >= (-128) && i <= 127
+      then b
+      else "(char)" :< b
     Short -> if i >= (-32767) && i <= 32767
       then b
       else "(short)" :< b
@@ -504,6 +537,9 @@ cleanLiteralUnsignedInteger size i b = case size of
     T.Size -> if i >= 0 && i <= 65535
       then b
       else "(size_t)" :< b
+    T.Char -> if i >= 0 && i <= 255
+      then b
+      else "(unsigned char)" :< b
     Short -> if i >= 0 && i <= 65535
       then b
       else "(unsigned short)" :< b
@@ -522,6 +558,7 @@ signedLiteralInteger size i = case size of
   Fixed w -> PrecBuilder{builder=signedFixedWidthLiteralInteger w i, prec=1}
   Platform p -> case p of
     T.Size -> PrecBuilder{builder= "(ssize_t)" :< i, prec=2}
+    T.Char -> PrecBuilder{builder= "(char)" :< i, prec=2}
     Short -> PrecBuilder{builder= "(short)" :< i, prec=2}
     Int -> PrecBuilder{builder=i, prec=0}
     Long -> PrecBuilder{builder= i :> "L", prec=0}
@@ -532,6 +569,7 @@ unsignedLiteralInteger size i = case size of
   Fixed w -> PrecBuilder{builder=unsignedFixedWidthLiteralInteger w i,prec=1}
   Platform p -> case p of
     T.Size -> PrecBuilder{builder= "(size_t)" :< i, prec=2}
+    T.Char -> PrecBuilder{builder= "(unsigned char)" :< i, prec=2}
     Short -> PrecBuilder{builder= "(unsigned short)" :< i, prec=2}
     Int -> PrecBuilder{builder= i :> "U", prec=0}
     Long -> PrecBuilder{builder= i :> "UL", prec=0}
@@ -563,6 +601,7 @@ type_ = \case
   Typedef t -> t :< mempty
   X86Vector v -> x86Vector v
   X86Mask w -> x86Mask w
+  Const t -> "const " <> type_ t
 
 -- | Encode a signed type.
 signed :: Size -> Builder
