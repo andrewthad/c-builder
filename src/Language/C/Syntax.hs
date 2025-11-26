@@ -114,6 +114,19 @@ data Expr
   | Initializers !(Builder Expr)
     -- ^ Initialized in braces, without names. (e.g. @{40, 100, 17}@)
 
+-- | This Num instance is not law abiding. It exists to help users build
+-- expressions. Numeric literals have the C type @int@. The binary arithmetic
+-- operators are implemented with their C counterparts. The functions
+-- @negate@, @abs@, and @signum@ all throw exceptions. Do not use them.
+instance Num Expr where
+  fromInteger i = Constant (Integer Ty.Signed (Ty.Platform Ty.Int) i)
+  a + b = Binary Add a b
+  a - b = Binary Sub a b
+  a * b = Binary Mul a b
+  negate _ = errorWithoutStackTrace "Language.C.Syntax: the Num instance for Expr does not support negate"
+  abs _ = errorWithoutStackTrace "Language.C.Syntax: the Num instance for Expr does not support abs"
+  signum _ = errorWithoutStackTrace "Language.C.Syntax: the Num instance for Expr does not support signum"
+
 -- | A function declaration
 data Function = Function
   { returnType :: !Type

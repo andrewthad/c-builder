@@ -12,6 +12,7 @@ category: Data
 library
   exposed-modules:
     Language.C.Encode
+    Language.C.Expr
     Language.C.Syntax
     Language.C.Type
     Language.C.Type.X86
