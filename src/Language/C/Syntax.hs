@@ -168,6 +168,8 @@ data Statement
     --
     -- Note: The standard allows programs to omit parts of the loop.
     -- That is not supported by this library.
+  | While Expr (Builder Statement)
+    -- ^ A while loop
   | Break
     -- ^ The C @break@ keyword used to break out of @for@, @if@, and @switch@.
   | Label LabelId

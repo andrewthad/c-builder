@@ -181,6 +181,18 @@ statement oneLevel indentation stmt0 = case stmt0 of
     where
     !indentation' = indentation <> oneLevel
     !indentation'' = indentation' <> oneLevel
+  -- Note: While and IfThen are identical except for the keyword. Refactor.
+  While e a ->
+       let a' = Chunks.concat (BoxedBuilder.run a) in
+       indentation
+    <> "while ("
+    <> expr_ e
+    <> ") "
+    <> ( if | length a' == 1, Expr a0 <- PM.indexSmallArray a' 0 -> expr_ a0 :> ";\n"
+            | otherwise -> "{\n"
+               <> foldMap (statement oneLevel (indentation <> oneLevel)) a'
+               <> (indentation :> "}\n")
+       )
   IfThen e a ->
        let a' = Chunks.concat (BoxedBuilder.run a) in
        indentation
