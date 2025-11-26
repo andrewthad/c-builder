@@ -37,37 +37,40 @@ import Language.C.Syntax
 import qualified Language.C.Type as Ty
 import qualified Data.Builder.Catenable as B
 
-infixl 1 :.
+-- To figure out the fixity, we do max(10 - c, 1) where c is the C fixity.
+-- For some reason, C and Haskell define precedence in opposite ways.
+
+infixl 9 :.
 pattern (:.) :: Expr -> Text -> Expr
 pattern obj :. mbr = Dot obj mbr
 
-infixl 1 :->
+infixl 9 :->
 pattern (:->) :: Expr -> Text -> Expr
 pattern obj :-> mbr = Arrow obj mbr
 
-infixl 4 :+
+infixl 6 :+
 pattern (:+) :: Expr -> Expr -> Expr
 pattern a :+ b = Binary Add a b
 
-infixl 3 :*
+infixl 7 :*
 pattern (:*) :: Expr -> Expr -> Expr
 pattern a :* b = Binary Mul a b
 
-infixl 6 :<
+infixl 4 :<
 pattern (:<) :: Expr -> Expr -> Expr
 pattern a :< b = Binary Lt a b
 
-infixl 6 :>
+infixl 4 :>
 pattern (:>) :: Expr -> Expr -> Expr
 pattern a :> b = Binary Gt a b
 
-infixl 7 :==
+infixl 3 :==
 pattern (:==) :: Expr -> Expr -> Expr
 pattern a :== b = Binary Eq a b
 
 -- Note: precedence level of assignment should be 14 but Haskell
 -- cannot go that high 
-infixl 9 :=
+infixl 1 :=
 pattern (:=) :: Expr -> Expr -> Expr
 pattern a := b = Assign a b
 
