@@ -20,7 +20,7 @@ module Language.C.Encode
 
 import Prelude hiding (id)
 
-import Language.C.Type (Platform(Short,Int,Long,LongLong))
+import Language.C.Type (Platform(Short,Int,IntPtr,Long,LongLong))
 import Language.C.Type hiding (Platform(..))
 import Language.C.Syntax hiding (type_,expr)
 import Data.Text.Short (ShortText)
@@ -649,6 +649,7 @@ signed = \case
     Int -> "int"
     Long -> "long"
     LongLong -> "long long"
+    IntPtr -> "intptr_t"
 
 -- | Encode an unsigned type.
 unsigned :: Size -> Builder
@@ -665,6 +666,7 @@ unsigned = \case
     Int -> "unsigned int"
     Long -> "unsigned long"
     LongLong -> "unsigned long long"
+    IntPtr -> "uintptr_t"
 
 x86Vector :: X86.Vector -> Builder
 x86Vector X86.Vector{width,element} =

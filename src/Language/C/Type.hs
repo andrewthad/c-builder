@@ -69,6 +69,7 @@ data Platform
   | Long
   | LongLong
   | Size
+  | IntPtr
   deriving (Eq)
 
 -- Note: Char is weird. Using @char@ without a signedness
