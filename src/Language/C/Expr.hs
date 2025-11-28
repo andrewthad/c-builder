@@ -9,6 +9,7 @@ module Language.C.Expr
   , pattern (:->)
     -- * Arithmetic
   , pattern (:+)
+  , pattern (:-)
   , pattern (:*)
   , pattern (:>)
   , pattern (:<)
@@ -51,6 +52,10 @@ pattern obj :-> mbr = Arrow obj mbr
 infixl 6 :+
 pattern (:+) :: Expr -> Expr -> Expr
 pattern a :+ b = Binary Add a b
+
+infixl 6 :-
+pattern (:-) :: Expr -> Expr -> Expr
+pattern a :- b = Binary Sub a b
 
 infixl 7 :*
 pattern (:*) :: Expr -> Expr -> Expr
